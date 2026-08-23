@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RiLogoutBoxRLine } from "@remixicon/react"
 
 import {
   buildFunnel,
@@ -129,17 +130,27 @@ export default async function Page({
             {APP_ID} · utolsó {days} nap
           </p>
         </div>
-        <nav className="flex gap-1">
-          {PERIODS.map((period) => (
-            <Button
-              key={period}
-              variant={period === days ? "default" : "outline"}
-              render={<Link href={`/?days=${period}`} />}
-            >
-              {period} nap
+        <div className="flex items-center gap-3">
+          <nav className="flex gap-1">
+            {PERIODS.map((period) => (
+              <Button
+                key={period}
+                variant={period === days ? "default" : "outline"}
+                nativeButton={false}
+                render={<Link href={`/?days=${period}`} />}
+              >
+                {period} nap
+              </Button>
+            ))}
+          </nav>
+          <Separator orientation="vertical" className="h-6" />
+          <form method="post" action="/api/logout">
+            <Button type="submit" variant="ghost">
+              <RiLogoutBoxRLine data-icon="inline-start" />
+              Kijelentkezés
             </Button>
-          ))}
-        </nav>
+          </form>
+        </div>
       </header>
 
       {loadError && (
