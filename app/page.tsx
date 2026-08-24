@@ -5,11 +5,13 @@ import {
   buildFunnel,
   buildOutcomes,
   buildProjectTypeBreakdown,
+  buildSessionRuns,
   type AnalyticsEvent,
   type FunnelRow,
 } from "@/lib/analytics"
 import { APP_ID } from "@/lib/funnel"
 import { supabaseAdmin } from "@/lib/supabase"
+import { SessionRuns } from "@/components/session-runs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +40,7 @@ import {
 
 const PERIODS = [7, 30, 90] as const
 const RAW_EVENT_LIMIT = 50
+const RUN_LIMIT = 20
 
 const numberFormat = new Intl.NumberFormat("hu-HU")
 const percentFormat = new Intl.NumberFormat("hu-HU", {
@@ -119,6 +122,7 @@ export default async function Page({
   const funnel = buildFunnel(events)
   const outcomes = buildOutcomes(events, funnel.at(-1)?.sessions ?? 0)
   const breakdown = buildProjectTypeBreakdown(events)
+  const runs = buildSessionRuns(events, RUN_LIMIT)
   const rawEvents = events.slice(-RAW_EVENT_LIMIT).reverse()
 
   return (
@@ -238,6 +242,36 @@ export default async function Page({
                 ))}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Kalkulátor-futások</CardTitle>
+          <CardDescription>
+            A legutóbbi {RUN_LIMIT} futás időrendben. Minden indítás új sor —
+            ugyanaz a munkamenet többször is nekifuthat. Az idők az indítástól
+            számítanak, a ✗ kimaradt lépést jelöl.
+          </CardDescription>
+          <CardAction>
+            <Badge variant="outline">
+              {numberFormat.format(runs.length)} futás
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {runs.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>Nincs futás</EmptyTitle>
+                <EmptyDescription>
+                  Ebben az időszakban egyetlen kalkulátor-indítás sem érkezett.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <SessionRuns runs={runs} />
           )}
         </CardContent>
       </Card>

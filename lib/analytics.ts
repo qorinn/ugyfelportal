@@ -152,3 +152,182 @@ export function buildProjectTypeBreakdown(
     }))
     .sort((a, b) => b.started - a.started)
 }
+
+// --- Futások (egy indítástól a kimenetig) -----------------------------------
+
+export type RunStepStatus = "reached" | "skipped" | "missing"
+
+export type RunStep = {
+  key: string
+  label: string
+  fullLabel: string
+  status: RunStepStatus
+  at: string | null
+  msFromStart: number | null
+  msFromPrevious: number | null
+}
+
+export type SessionRun = {
+  id: string
+  sessionId: string
+  startedAt: string
+  steps: RunStep[]
+  outcomeLabel: string | null
+  // null = az indításon kívül nem történt semmi. Nem nulla és nem végtelen: nem fejezte be.
+  totalMs: number | null
+}
+
+export const OUTCOME_SLOT_KEY = "outcome"
+
+const ENTRY_STEP = CALCULATOR_FUNNEL[0]
+const OUTCOME_NAMES = new Set<string>(CALCULATOR_OUTCOMES.map((o) => o.name))
+
+function toTime(iso: string): number {
+  return new Date(iso).getTime()
+}
+
+// Egy session eseményeit futásokra vágjuk: minden calculator_started új futást nyit.
+// Ami az első indítás elé esik (mert a session az időszak előtt kezdődött), az is
+// kap egy futást — ott az indítás lépés kimaradtként jelenik meg.
+function splitIntoRuns(
+  sessionEvents: readonly AnalyticsEvent[]
+): AnalyticsEvent[][] {
+  const runs: AnalyticsEvent[][] = []
+
+  for (const event of sessionEvents) {
+    if (event.name === ENTRY_STEP.name || runs.length === 0) {
+      runs.push([])
+    }
+    runs[runs.length - 1].push(event)
+  }
+
+  return runs
+}
+
+function buildRun(
+  sessionId: string,
+  runEvents: readonly AnalyticsEvent[]
+): SessionRun {
+  // Ugyanaz az esemény kétszer nem külön lépés — az elsőt tartjuk meg.
+  const firstByName = new Map<string, AnalyticsEvent>()
+  for (const event of runEvents) {
+    if (!firstByName.has(event.name)) {
+      firstByName.set(event.name, event)
+    }
+  }
+
+  const outcomeEvent =
+    runEvents.find((event) => OUTCOME_NAMES.has(event.name)) ?? null
+  const outcome = outcomeEvent
+    ? (CALCULATOR_OUTCOMES.find((o) => o.name === outcomeEvent.name) ?? null)
+    : null
+
+  const slots = [
+    ...CALCULATOR_FUNNEL.map((step) => ({
+      key: step.name,
+      label: step.short,
+      fullLabel: step.label,
+      event: firstByName.get(step.name) ?? null,
+    })),
+    {
+      key: OUTCOME_SLOT_KEY,
+      label: outcome?.short ?? "Kimenet",
+      fullLabel: outcome?.label ?? "Nem lépett tovább",
+      event: outcomeEvent,
+    },
+  ]
+
+  // Az utolsó elért lépés után minden "missing" (nem jutott el odáig), előtte
+  // viszont minden hiányzó lépés "skipped" — azt tényleg kihagyta.
+  const lastReached = slots.reduce(
+    (last, slot, index) => (slot.event ? index : last),
+    -1
+  )
+
+  const base = toTime(runEvents[0].created_at)
+  let previousTime: number | null = null
+
+  const steps: RunStep[] = slots.map((slot, index) => {
+    const status: RunStepStatus = slot.event
+      ? "reached"
+      : index < lastReached
+        ? "skipped"
+        : "missing"
+
+    if (!slot.event) {
+      return {
+        key: slot.key,
+        label: slot.label,
+        fullLabel: slot.fullLabel,
+        status,
+        at: null,
+        msFromStart: null,
+        msFromPrevious: null,
+      }
+    }
+
+    const at = toTime(slot.event.created_at)
+    const fromPrevious = previousTime === null ? null : at - previousTime
+    previousTime = at
+
+    return {
+      key: slot.key,
+      label: slot.label,
+      fullLabel: slot.fullLabel,
+      status,
+      at: slot.event.created_at,
+      msFromStart: at - base,
+      // Az órák elcsúszhatnak a kliens- és szerveroldali események között;
+      // negatív különbséget nem mutatunk, inkább semmit.
+      msFromPrevious:
+        fromPrevious !== null && fromPrevious >= 0 ? fromPrevious : null,
+    }
+  })
+
+  const reachedTimes = steps
+    .map((step) => step.at)
+    .filter((at): at is string => at !== null)
+    .map(toTime)
+
+  return {
+    id: `${sessionId}-${runEvents[0].created_at}`,
+    sessionId,
+    startedAt: runEvents[0].created_at,
+    steps,
+    outcomeLabel: outcome?.label ?? null,
+    totalMs:
+      reachedTimes.length > 1
+        ? reachedTimes[reachedTimes.length - 1] - reachedTimes[0]
+        : null,
+  }
+}
+
+export function buildSessionRuns(
+  events: readonly AnalyticsEvent[],
+  limit: number
+): SessionRun[] {
+  const sorted = [...events].sort(
+    (a, b) => toTime(a.created_at) - toTime(b.created_at)
+  )
+
+  const bySession = new Map<string, AnalyticsEvent[]>()
+  for (const event of sorted) {
+    const list = bySession.get(event.session_id)
+    if (list) {
+      list.push(event)
+    } else {
+      bySession.set(event.session_id, [event])
+    }
+  }
+
+  const runs: SessionRun[] = []
+  for (const [sessionId, sessionEvents] of bySession) {
+    for (const runEvents of splitIntoRuns(sessionEvents)) {
+      runs.push(buildRun(sessionId, runEvents))
+    }
+  }
+
+  return runs
+    .sort((a, b) => toTime(b.startedAt) - toTime(a.startedAt))
+    .slice(0, limit)
+}
