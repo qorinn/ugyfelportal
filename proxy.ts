@@ -17,6 +17,9 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/event|api/login|login|_next/static|_next/image|favicon.ico|robots.txt).*)",
+    // Az api/lead$ horgony szándékos: az /api/lead szerver-szerver hívás Bearer
+    // tokennel, de az /api/lead-followup dashboard-művelet, aminek védve KELL
+    // maradnia. Horgony nélkül a prefix-illesztés azt is kiengedné.
+    "/((?!api/event|api/lead$|api/login|login|_next/static|_next/image|favicon.ico|robots.txt).*)",
   ],
 }

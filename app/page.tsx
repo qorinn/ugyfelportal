@@ -10,6 +10,7 @@ import {
   type FunnelRow,
 } from "@/lib/analytics"
 import { APP_ID } from "@/lib/funnel"
+import { type DisplayLead } from "@/lib/leads"
 import { supabaseAdmin } from "@/lib/supabase"
 import { SessionRuns } from "@/components/session-runs"
 import { Badge } from "@/components/ui/badge"
@@ -47,9 +48,12 @@ const percentFormat = new Intl.NumberFormat("hu-HU", {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 })
+// A Supabase UTC-ben tárol és a Vercel is UTC-ben fut — időzóna nélkül nyáron
+// két órával korábbi időpont jelenne meg.
 const dateTimeFormat = new Intl.DateTimeFormat("hu-HU", {
   dateStyle: "short",
   timeStyle: "medium",
+  timeZone: "Europe/Budapest",
 })
 
 function parseDays(value: string | string[] | undefined): number {
@@ -77,6 +81,30 @@ async function loadEvents(days: number) {
   }
 
   return (data ?? []) as AnalyticsEvent[]
+}
+
+// A leadeket a látott munkamenetekre szűkítve kérjük le, nem időszakra: a lead
+// később is keletkezhet, mint az első esemény.
+async function loadLeads(sessionIds: string[]) {
+  if (sessionIds.length === 0) {
+    return new Map<string, DisplayLead>()
+  }
+
+  const { data, error } = await supabaseAdmin()
+    .from("leads")
+    .select(
+      "session_id, email, name, phone, project_type, estimate_low, estimate_high, duration_label, status, followed_up_at"
+    )
+    .eq("app_id", APP_ID)
+    .in("session_id", sessionIds)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return new Map(
+    ((data ?? []) as DisplayLead[]).map((lead) => [lead.session_id, lead])
+  )
 }
 
 function FunnelBar({ row }: { row: FunnelRow }) {
@@ -111,10 +139,12 @@ export default async function Page({
   const days = parseDays((await searchParams).days)
 
   let events: AnalyticsEvent[] = []
+  let leads = new Map<string, DisplayLead>()
   let loadError: string | null = null
 
   try {
     events = await loadEvents(days)
+    leads = await loadLeads([...new Set(events.map((e) => e.session_id))])
   } catch (error) {
     loadError = error instanceof Error ? error.message : String(error)
   }
@@ -271,7 +301,7 @@ export default async function Page({
               </EmptyHeader>
             </Empty>
           ) : (
-            <SessionRuns runs={runs} />
+            <SessionRuns runs={runs} leads={leads} />
           )}
         </CardContent>
       </Card>

@@ -108,7 +108,12 @@ values go in a gitignored `.env.local`.
 - [lib/auth.ts](lib/auth.ts) — the dashboard cookie is `<expiry>.<HMAC(expiry)>` keyed by
   `DASHBOARD_PASSWORD`; the password itself is never stored in the cookie. Throws when
   the env var is missing, so the gate fails closed.
-- [proxy.ts](proxy.ts) — the gate. Its matcher deliberately excludes `/api/event`, which
-  authenticates with its own `Bearer INGEST_SECRET` instead.
+- [lib/leads.ts](lib/leads.ts) — lead status ranking, the two merge rules (status only
+  strengthens; empty values never overwrite), and the Gmail follow-up template. Pure
+  functions, deliberately separate from the route handler.
+- [proxy.ts](proxy.ts) — the gate. Its matcher excludes `/api/event` and `/api/lead`,
+  which authenticate with their own `Bearer INGEST_SECRET`. **The `api/lead$` anchor is
+  load-bearing**: without it the prefix match would also unprotect
+  `/api/lead-followup`, which is a dashboard action and must stay behind the gate.
 - [supabase/migrations/](supabase/migrations/) — SQL to run by hand in the Supabase SQL
   editor. There is no migration tooling.
