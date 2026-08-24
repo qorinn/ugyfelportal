@@ -2,11 +2,10 @@ import { RiCheckLine, RiCloseLine, RiPhoneLine } from "@remixicon/react"
 
 import {
   OUTCOME_SLOT_KEY,
-  type EmailActivity,
   type RunStep,
   type SessionRun,
 } from "@/lib/analytics"
-import { CALCULATOR_FUNNEL, EMAIL_TYPE_LABELS } from "@/lib/funnel"
+import { CALCULATOR_FUNNEL } from "@/lib/funnel"
 import { gmailComposeUrl, type DisplayLead } from "@/lib/leads"
 import { cn } from "@/lib/utils"
 import { DeleteSessionButton } from "@/components/delete-session-button"
@@ -16,7 +15,6 @@ import { Button } from "@/components/ui/button"
 
 const EMAIL_STEP_KEY = CALCULATOR_FUNNEL[2].name
 const CALLBACK_OUTCOME = "calculator_callback_requested"
-const REFINE_OUTCOME = "calculator_refine_requested"
 
 // A Supabase UTC-ben tárol és a Vercel is UTC-ben fut — időzóna nélkül nyáron
 // két órával korábbi időpont jelenne meg.
@@ -90,17 +88,14 @@ function Checkpoint({ step }: { step: RunStep }) {
   )
 }
 
-// Egy igen/nem jelzés a checkpoint alatt. A halvány változat a bizonytalan
-// adaté (előtöltött megnyitás), nem a nemleges válaszé.
+// Egy igen/nem jelzés a checkpoint alatt.
 function Flag({
   ok,
   label,
-  muted = false,
   title,
 }: {
   ok: boolean
   label: string
-  muted?: boolean
   title?: string
 }) {
   const Icon = ok ? RiCheckLine : RiCloseLine
@@ -110,7 +105,7 @@ function Flag({
       title={title}
       className={cn(
         "flex items-center justify-center gap-1 text-center text-[10px] leading-tight",
-        ok && !muted ? "text-foreground" : "text-muted-foreground"
+        ok ? "text-foreground" : "text-muted-foreground"
       )}
     >
       <Icon className="size-2.5 shrink-0" />
@@ -119,60 +114,8 @@ function Flag({
   )
 }
 
-function EmailFlags({ activity }: { activity: EmailActivity }) {
-  return (
-    <>
-      <span className="text-[10px] leading-tight font-medium text-muted-foreground">
-        {EMAIL_TYPE_LABELS[activity.emailType]}
-      </span>
-      {activity.opened ? (
-        <Flag
-          ok
-          label="Megnyitotta"
-          title={
-            activity.openedAt
-              ? dateTimeFormat.format(new Date(activity.openedAt))
-              : undefined
-          }
-        />
-      ) : activity.prefetchedOnly ? (
-        <Flag
-          ok
-          muted
-          label="Előtöltve"
-          title="Csak a levelező proxyja töltötte elő a képet (Apple Mail adatvédelmi funkciója) — nem valódi megnyitás."
-        />
-      ) : (
-        <Flag ok={false} label="Nem nyitotta meg" />
-      )}
-      <Flag
-        ok={activity.phoneClicked}
-        label={
-          activity.phoneClicked
-            ? "Telefonra kattintott"
-            : "Telefonra nem kattintott"
-        }
-        title={
-          activity.clickedAt && activity.phoneClicked
-            ? dateTimeFormat.format(new Date(activity.clickedAt))
-            : undefined
-        }
-      />
-      {activity.websiteClicked && <Flag ok label="Weboldalra kattintott" />}
-    </>
-  )
-}
-
 function StepAnnotations({ step, run }: { step: RunStep; run: SessionRun }) {
-  if (step.key === EMAIL_STEP_KEY && step.status === "reached") {
-    return <EmailFlags activity={run.emails.quote} />
-  }
-
   if (step.key === OUTCOME_SLOT_KEY && run.outcomes.length > 0) {
-    const refined = run.outcomes.some(
-      (outcome) => outcome.name === REFINE_OUTCOME
-    )
-
     return (
       <>
         {run.outcomes.map((outcome) => (
@@ -183,7 +126,6 @@ function StepAnnotations({ step, run }: { step: RunStep; run: SessionRun }) {
             title={dateTimeFormat.format(new Date(outcome.at))}
           />
         ))}
-        {refined && <EmailFlags activity={run.emails.refined_quote} />}
       </>
     )
   }

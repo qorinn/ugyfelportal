@@ -1,9 +1,4 @@
-import {
-  ALLOWED_PROPS,
-  EMAIL_EVENT_PREFIX,
-  KNOWN_EVENT_NAMES,
-  isEmailType,
-} from "@/lib/funnel"
+import { ALLOWED_PROPS, KNOWN_EVENT_NAMES } from "@/lib/funnel"
 import { supabaseAdmin } from "@/lib/supabase"
 
 const UUID_PATTERN =
@@ -71,16 +66,6 @@ export async function POST(request: Request) {
   }
 
   const sanitized = sanitizeProps(props)
-
-  // A levélesemény emailType nélkül értelmezhetetlen: nem tudnánk megmondani,
-  // melyik levélről szól. Inkább visszautasítjuk, mint hogy besorolhatatlan
-  // sor kerüljön a táblába.
-  if (
-    name.startsWith(EMAIL_EVENT_PREFIX) &&
-    !isEmailType(sanitized.emailType)
-  ) {
-    return new Response("Invalid emailType", { status: 400 })
-  }
 
   const { error } = await supabaseAdmin().from("events").insert({
     app_id: appId,

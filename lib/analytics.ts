@@ -1,8 +1,6 @@
 import {
   CALCULATOR_FUNNEL,
   CALCULATOR_OUTCOMES,
-  EMAIL_TYPES,
-  type EmailType,
   type FunnelOutcome,
   type FunnelStep,
 } from "@/lib/funnel"
@@ -176,25 +174,12 @@ export type RunOutcome = {
   at: string
 }
 
-export type EmailActivity = {
-  emailType: EmailType
-  // Valódi megnyitás. A prefetched a levelező proxyja (Apple Mail), nem ember —
-  // egy számban keverve félrevezető lenne, ezért külön mezőben tartjuk.
-  opened: boolean
-  prefetchedOnly: boolean
-  openedAt: string | null
-  phoneClicked: boolean
-  websiteClicked: boolean
-  clickedAt: string | null
-}
-
 export type SessionRun = {
   id: string
   sessionId: string
   startedAt: string
   steps: RunStep[]
   outcomes: RunOutcome[]
-  emails: Record<EmailType, EmailActivity>
   // null = az indításon kívül nem történt semmi. Nem nulla és nem végtelen: nem fejezte be.
   totalMs: number | null
 }
@@ -224,33 +209,6 @@ function splitIntoRuns(
   }
 
   return runs
-}
-
-function buildEmailActivity(
-  runEvents: readonly AnalyticsEvent[],
-  emailType: EmailType
-): EmailActivity {
-  const relevant = runEvents.filter(
-    (event) => event.props?.emailType === emailType
-  )
-
-  const opens = relevant.filter((event) => event.name === "email_opened")
-  const realOpen = opens.find((event) => event.props?.prefetched !== true)
-  const anyOpen = opens[0]
-
-  const clicks = relevant.filter((event) => event.name === "email_link_clicked")
-  const phoneClick = clicks.find((event) => event.props?.target === "phone")
-  const websiteClick = clicks.find((event) => event.props?.target === "website")
-
-  return {
-    emailType,
-    opened: realOpen !== undefined,
-    prefetchedOnly: realOpen === undefined && anyOpen !== undefined,
-    openedAt: (realOpen ?? anyOpen)?.created_at ?? null,
-    phoneClicked: phoneClick !== undefined,
-    websiteClicked: websiteClick !== undefined,
-    clickedAt: (phoneClick ?? websiteClick)?.created_at ?? null,
-  }
 }
 
 function buildRun(
@@ -356,20 +314,12 @@ function buildRun(
     .filter((at): at is string => at !== null)
     .map(toTime)
 
-  const emails = Object.fromEntries(
-    EMAIL_TYPES.map((emailType) => [
-      emailType,
-      buildEmailActivity(runEvents, emailType),
-    ])
-  ) as Record<EmailType, EmailActivity>
-
   return {
     id: `${sessionId}-${runEvents[0].created_at}`,
     sessionId,
     startedAt: runEvents[0].created_at,
     steps,
     outcomes,
-    emails,
     totalMs:
       reachedTimes.length > 1
         ? reachedTimes[reachedTimes.length - 1] - reachedTimes[0]
