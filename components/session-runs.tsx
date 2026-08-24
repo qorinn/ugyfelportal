@@ -9,6 +9,7 @@ import {
 import { CALCULATOR_FUNNEL, EMAIL_TYPE_LABELS } from "@/lib/funnel"
 import { gmailComposeUrl, type DisplayLead } from "@/lib/leads"
 import { cn } from "@/lib/utils"
+import { DeleteSessionButton } from "@/components/delete-session-button"
 import { FollowupButton } from "@/components/followup-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -270,7 +271,15 @@ function RunTimeline({ run }: { run: SessionRun }) {
   )
 }
 
-function RunRow({ run, lead }: { run: SessionRun; lead: DisplayLead | null }) {
+function RunRow({
+  run,
+  lead,
+  runCount,
+}: {
+  run: SessionRun
+  lead: DisplayLead | null
+  runCount: number
+}) {
   // Név, ha van; különben e-mail; végül a munkamenet-azonosító eleje.
   const identity =
     lead?.name?.trim() || lead?.email?.trim() || run.sessionId.slice(0, 8)
@@ -282,8 +291,17 @@ function RunRow({ run, lead }: { run: SessionRun; lead: DisplayLead | null }) {
   const wantsCallback = run.outcomes.some(
     (outcome) => outcome.name === CALLBACK_OUTCOME
   )
-  const hasActions =
-    Boolean(lead?.email) || Boolean(wantsCallback && lead?.phone)
+
+  // Az ársávot csak arra a futásra írjuk ki, amelyik tényleg eljutott a
+  // becslésig. A lead a munkamenethez tartozik, nem a futáshoz — enélkül egy
+  // korábbi, félbehagyott nekifutás alatt is ott lenne az ár.
+  const reachedEstimate = run.steps.some(
+    (step) => step.key === EMAIL_STEP_KEY && step.status === "reached"
+  )
+  const estimate =
+    reachedEstimate && lead?.estimate_low && lead?.estimate_high
+      ? `${lead.estimate_low} – ${lead.estimate_high}`
+      : null
 
   return (
     <div className="flex flex-col gap-4 py-6 first:pt-0 last:pb-0">
@@ -295,6 +313,24 @@ function RunRow({ run, lead }: { run: SessionRun; lead: DisplayLead | null }) {
           <span className="font-mono text-xs text-muted-foreground">
             {dateTimeFormat.format(new Date(run.startedAt))}
           </span>
+          {estimate && (
+            <span
+              className="font-mono text-xs"
+              title={
+                lead?.duration_label
+                  ? `Becsült határidő: ${lead.duration_label}`
+                  : undefined
+              }
+            >
+              {estimate}
+              {lead?.duration_label && (
+                <span className="text-muted-foreground">
+                  {" · "}
+                  {lead.duration_label}
+                </span>
+              )}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {run.outcomes.map((outcome) => (
@@ -324,33 +360,38 @@ function RunRow({ run, lead }: { run: SessionRun; lead: DisplayLead | null }) {
         </p>
       )}
 
-      {hasActions && lead && (
-        <div className="flex flex-wrap items-center gap-2">
-          {lead.email && (
-            <FollowupButton
-              sessionId={lead.session_id}
-              gmailUrl={gmailComposeUrl(lead)}
-              followedUp={lead.followed_up_at !== null}
-            />
-          )}
-          {wantsCallback && lead.phone && (
-            <Button
-              size="xs"
-              variant="outline"
-              nativeButton={false}
-              render={<a href={`tel:${lead.phone.replace(/\s/g, "")}`} />}
-            >
-              <RiPhoneLine data-icon="inline-start" />
-              {lead.phone}
-            </Button>
-          )}
-          {lead.followed_up_at && (
-            <span className="text-[10px] text-muted-foreground">
-              Follow-up: {dateFormat.format(new Date(lead.followed_up_at))}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {lead?.email && (
+          <FollowupButton
+            sessionId={lead.session_id}
+            gmailUrl={gmailComposeUrl(lead)}
+            followedUp={lead.followed_up_at !== null}
+          />
+        )}
+        {wantsCallback && lead?.phone && (
+          <Button
+            size="xs"
+            variant="outline"
+            nativeButton={false}
+            render={<a href={`tel:${lead.phone.replace(/\s/g, "")}`} />}
+          >
+            <RiPhoneLine data-icon="inline-start" />
+            {lead.phone}
+          </Button>
+        )}
+        {/* A törlés akkor is elérhető, ha nincs lead — az eseményeket akkor is viszi. */}
+        <DeleteSessionButton
+          sessionId={run.sessionId}
+          identity={identity}
+          runCount={runCount}
+          hasLead={lead !== null}
+        />
+        {lead?.followed_up_at && (
+          <span className="text-[10px] text-muted-foreground">
+            Follow-up: {dateFormat.format(new Date(lead.followed_up_at))}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -362,6 +403,16 @@ export function SessionRuns({
   runs: SessionRun[]
   leads: Map<string, DisplayLead>
 }) {
+  // A törlés a teljes munkamenetet viszi, ezért a megerősítésnek tudnia kell,
+  // hány futás tűnik el vele.
+  const runsPerSession = new Map<string, number>()
+  for (const run of runs) {
+    runsPerSession.set(
+      run.sessionId,
+      (runsPerSession.get(run.sessionId) ?? 0) + 1
+    )
+  }
+
   return (
     <div className="flex flex-col divide-y divide-border">
       {runs.map((run) => (
@@ -369,6 +420,7 @@ export function SessionRuns({
           key={run.id}
           run={run}
           lead={leads.get(run.sessionId) ?? null}
+          runCount={runsPerSession.get(run.sessionId) ?? 1}
         />
       ))}
     </div>
