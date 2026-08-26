@@ -1,6 +1,7 @@
 import {
   CALCULATOR_FUNNEL,
   CALCULATOR_OUTCOMES,
+  ERROR_EVENT_NAME,
   type FunnelOutcome,
   type FunnelStep,
 } from "@/lib/funnel"
@@ -180,6 +181,9 @@ export type SessionRun = {
   startedAt: string
   steps: RunStep[]
   outcomes: RunOutcome[]
+  // Nyers hibaesemények, nem feldolgozva: a lib/errors.ts végzi a parse-olást,
+  // így nem lesz körkörös import a két modul között.
+  errorEvents: AnalyticsEvent[]
   // null = az indításon kívül nem történt semmi. Nem nulla és nem végtelen: nem fejezte be.
   totalMs: number | null
 }
@@ -320,6 +324,7 @@ function buildRun(
     startedAt: runEvents[0].created_at,
     steps,
     outcomes,
+    errorEvents: runEvents.filter((event) => event.name === ERROR_EVENT_NAME),
     totalMs:
       reachedTimes.length > 1
         ? reachedTimes[reachedTimes.length - 1] - reachedTimes[0]

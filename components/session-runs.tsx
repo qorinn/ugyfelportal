@@ -1,12 +1,18 @@
-import { RiCheckLine, RiCloseLine, RiPhoneLine } from "@remixicon/react"
+import {
+  RiAlertLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiErrorWarningLine,
+  RiPhoneLine,
+} from "@remixicon/react"
 
 import {
   OUTCOME_SLOT_KEY,
   type RunStep,
   type SessionRun,
 } from "@/lib/analytics"
-import { CALCULATOR_FUNNEL } from "@/lib/funnel"
-import type { ErrorSummary } from "@/lib/errors"
+import { CALCULATOR_FUNNEL, MANUAL_FOLLOWUP_STAGE } from "@/lib/funnel"
+import { parseErrors, type CalculatorError } from "@/lib/errors"
 import { gmailComposeUrl, type DisplayLead } from "@/lib/leads"
 import { cn } from "@/lib/utils"
 import { DeleteSessionButton } from "@/components/delete-session-button"
@@ -214,33 +220,100 @@ function RunTimeline({ run }: { run: SessionRun }) {
   )
 }
 
-// A hiba a munkamenethez tartozik, nem a futáshoz — a jelzés ezért a sor
-// egészére vonatkozik, és a legsúlyosabb esetet mutatja.
-function errorBadge(sessionId: string, errors: ErrorSummary) {
-  if (errors.manualFollowupSessions.has(sessionId)) {
+// A legsúlyosabb esetet mutatja ennek a futásnak a saját hibáiból. Munkamenet
+// helyett futás: ha valaki kétszer nekifutott, a hiba csak az érintett soron
+// jelenik meg, nem mindkettőn.
+function errorBadge(errors: readonly CalculatorError[]) {
+  if (errors.length === 0) {
+    return null
+  }
+  if (errors.some((error) => error.stage === MANUAL_FOLLOWUP_STAGE)) {
     return { label: "Levél nem ment ki", variant: "destructive" as const }
   }
-  if (errors.fatalSessionIds.has(sessionId)) {
+  if (errors.some((error) => error.fatal)) {
     return { label: "Elakadt", variant: "destructive" as const }
   }
-  if (errors.sessionsWithError.has(sessionId)) {
-    return { label: "Hiba", variant: "outline" as const }
-  }
-  return null
+  return { label: "Hiba", variant: "outline" as const }
+}
+
+// A hibák a futás idővonala alá kerülnek, az indításhoz mért időbélyeggel —
+// így látszik, a folyamat melyik pontján hasalt el.
+function RunErrors({
+  errors,
+  startedAt,
+}: {
+  errors: readonly CalculatorError[]
+  startedAt: string
+}) {
+  const base = new Date(startedAt).getTime()
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-dashed border-destructive/30 bg-destructive/5 p-3">
+      {errors.map((error, index) => {
+        const offset = new Date(error.createdAt).getTime() - base
+        const Icon = error.fatal ? RiAlertLine : RiErrorWarningLine
+
+        return (
+          <div
+            key={`${error.createdAt}-${error.stage}-${index}`}
+            className="flex flex-col gap-0.5"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <Icon
+                className={cn(
+                  "size-3 shrink-0 self-center",
+                  error.fatal ? "text-destructive" : "text-muted-foreground"
+                )}
+              />
+              <span
+                className={cn(
+                  "text-xs font-medium",
+                  error.fatal ? "text-destructive" : "text-foreground"
+                )}
+              >
+                {error.stageLabel}
+              </span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {error.source}
+                {error.status !== null && ` · ${error.status}`}
+                {offset >= 0 && ` · +${formatDuration(offset)}`}
+              </span>
+              {!error.fatal && (
+                <span className="text-[10px] text-muted-foreground">
+                  nem akasztotta meg
+                </span>
+              )}
+            </div>
+            {error.message && (
+              <p className="pl-5 text-[11px] text-muted-foreground">
+                {error.message}
+              </p>
+            )}
+            {error.extras.length > 0 && (
+              <p className="pl-5 font-mono text-[10px] break-all text-muted-foreground">
+                {error.extras
+                  .map((extra) => `${extra.key}: ${extra.value}`)
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function RunRow({
   run,
   lead,
   runCount,
-  errors,
 }: {
   run: SessionRun
   lead: DisplayLead | null
   runCount: number
-  errors: ErrorSummary
 }) {
-  const error = errorBadge(run.sessionId, errors)
+  const errors = parseErrors(run.errorEvents)
+  const error = errorBadge(errors)
   // Név, ha van; különben e-mail; végül a munkamenet-azonosító eleje.
   const identity =
     lead?.name?.trim() || lead?.email?.trim() || run.sessionId.slice(0, 8)
@@ -316,6 +389,10 @@ function RunRow({
         </div>
       </div>
 
+      {errors.length > 0 && (
+        <RunErrors errors={errors} startedAt={run.startedAt} />
+      )}
+
       {skipped.length > 0 && (
         <p className="text-[10px] text-destructive/70">
           Kimaradt: {skipped.map((step) => step.fullLabel).join(", ")}
@@ -361,11 +438,9 @@ function RunRow({
 export function SessionRuns({
   runs,
   leads,
-  errors,
 }: {
   runs: SessionRun[]
   leads: Map<string, DisplayLead>
-  errors: ErrorSummary
 }) {
   // A törlés a teljes munkamenetet viszi, ezért a megerősítésnek tudnia kell,
   // hány futás tűnik el vele.
@@ -385,7 +460,6 @@ export function SessionRuns({
           run={run}
           lead={leads.get(run.sessionId) ?? null}
           runCount={runsPerSession.get(run.sessionId) ?? 1}
-          errors={errors}
         />
       ))}
     </div>

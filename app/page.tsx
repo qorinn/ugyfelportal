@@ -317,7 +317,7 @@ export default async function Page({
               </EmptyHeader>
             </Empty>
           ) : (
-            <SessionRuns runs={runs} leads={leads} errors={errorSummary} />
+            <SessionRuns runs={runs} leads={leads} />
           )}
         </CardContent>
       </Card>
