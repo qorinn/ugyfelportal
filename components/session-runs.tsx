@@ -6,6 +6,7 @@ import {
   type SessionRun,
 } from "@/lib/analytics"
 import { CALCULATOR_FUNNEL } from "@/lib/funnel"
+import type { ErrorSummary } from "@/lib/errors"
 import { gmailComposeUrl, type DisplayLead } from "@/lib/leads"
 import { cn } from "@/lib/utils"
 import { DeleteSessionButton } from "@/components/delete-session-button"
@@ -213,15 +214,33 @@ function RunTimeline({ run }: { run: SessionRun }) {
   )
 }
 
+// A hiba a munkamenethez tartozik, nem a futáshoz — a jelzés ezért a sor
+// egészére vonatkozik, és a legsúlyosabb esetet mutatja.
+function errorBadge(sessionId: string, errors: ErrorSummary) {
+  if (errors.manualFollowupSessions.has(sessionId)) {
+    return { label: "Levél nem ment ki", variant: "destructive" as const }
+  }
+  if (errors.fatalSessionIds.has(sessionId)) {
+    return { label: "Elakadt", variant: "destructive" as const }
+  }
+  if (errors.sessionsWithError.has(sessionId)) {
+    return { label: "Hiba", variant: "outline" as const }
+  }
+  return null
+}
+
 function RunRow({
   run,
   lead,
   runCount,
+  errors,
 }: {
   run: SessionRun
   lead: DisplayLead | null
   runCount: number
+  errors: ErrorSummary
 }) {
+  const error = errorBadge(run.sessionId, errors)
   // Név, ha van; különben e-mail; végül a munkamenet-azonosító eleje.
   const identity =
     lead?.name?.trim() || lead?.email?.trim() || run.sessionId.slice(0, 8)
@@ -275,6 +294,7 @@ function RunRow({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {error && <Badge variant={error.variant}>{error.label}</Badge>}
           {run.outcomes.map((outcome) => (
             <Badge key={outcome.name} variant="secondary">
               {outcome.label}
@@ -341,9 +361,11 @@ function RunRow({
 export function SessionRuns({
   runs,
   leads,
+  errors,
 }: {
   runs: SessionRun[]
   leads: Map<string, DisplayLead>
+  errors: ErrorSummary
 }) {
   // A törlés a teljes munkamenetet viszi, ezért a megerősítésnek tudnia kell,
   // hány futás tűnik el vele.
@@ -363,6 +385,7 @@ export function SessionRuns({
           run={run}
           lead={leads.get(run.sessionId) ?? null}
           runCount={runsPerSession.get(run.sessionId) ?? 1}
+          errors={errors}
         />
       ))}
     </div>

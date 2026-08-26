@@ -9,9 +9,15 @@ import {
   type AnalyticsEvent,
   type FunnelRow,
 } from "@/lib/analytics"
-import { APP_ID } from "@/lib/funnel"
+import { APP_ID, CALCULATOR_FUNNEL } from "@/lib/funnel"
+import { buildErrorSummary } from "@/lib/errors"
 import { type DisplayLead } from "@/lib/leads"
 import { supabaseAdmin } from "@/lib/supabase"
+import {
+  ErrorPanel,
+  ManualFollowupPanel,
+  RecentErrors,
+} from "@/components/error-panel"
 import { SessionRuns } from "@/components/session-runs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -42,6 +48,7 @@ import {
 const PERIODS = [7, 30, 90] as const
 const RAW_EVENT_LIMIT = 50
 const RUN_LIMIT = 20
+const RAW_ERROR_LIMIT = 50
 
 const numberFormat = new Intl.NumberFormat("hu-HU")
 const percentFormat = new Intl.NumberFormat("hu-HU", {
@@ -153,6 +160,11 @@ export default async function Page({
   const outcomes = buildOutcomes(events, funnel.at(-1)?.sessions ?? 0)
   const breakdown = buildProjectTypeBreakdown(events)
   const runs = buildSessionRuns(events, RUN_LIMIT)
+  const errorSummary = buildErrorSummary(
+    events,
+    CALCULATOR_FUNNEL[0].name,
+    RAW_ERROR_LIMIT
+  )
   const rawEvents = events.slice(-RAW_EVENT_LIMIT).reverse()
 
   return (
@@ -222,6 +234,10 @@ export default async function Page({
           ))}
         </CardContent>
       </Card>
+
+      <ErrorPanel summary={errorSummary} />
+
+      <ManualFollowupPanel summary={errorSummary} leads={leads} />
 
       <Card>
         <CardHeader>
@@ -301,10 +317,12 @@ export default async function Page({
               </EmptyHeader>
             </Empty>
           ) : (
-            <SessionRuns runs={runs} leads={leads} />
+            <SessionRuns runs={runs} leads={leads} errors={errorSummary} />
           )}
         </CardContent>
       </Card>
+
+      <RecentErrors summary={errorSummary} limit={RAW_ERROR_LIMIT} />
 
       <Card>
         <CardHeader>

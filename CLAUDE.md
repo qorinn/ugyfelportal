@@ -111,6 +111,14 @@ values go in a gitignored `.env.local`.
 - [lib/leads.ts](lib/leads.ts) — lead status ranking, the two merge rules (status only
   strengthens; empty values never overwrite), and the Gmail follow-up template. Pure
   functions, deliberately separate from the route handler.
+- [lib/errors.ts](lib/errors.ts) — `calculator_error` aggregation. **Count distinct
+  sessions, never rows**: one failed request emits both a client and a server error with
+  the same `session_id`. Client errors are also capped at 5 per session upstream, so
+  event counts are a lower bound while the session rate is exact.
+- [lib/props.ts](lib/props.ts) — the ingest clamp (24 keys, 300 chars, 4096 bytes,
+  scalars only). Replaced the old key whitelist because error props are stage-dependent.
+  Consequence: `props` is no longer trusted data — the paladi-web `/api/track` proxy that
+  feeds it is public and unauthenticated, so always render `message` as text, never HTML.
 - [proxy.ts](proxy.ts) — the gate. Its matcher excludes `/api/event` and `/api/lead`,
   which authenticate with their own `Bearer INGEST_SECRET`. **The `api/lead$` anchor is
   load-bearing**: without it the prefix match would also unprotect
