@@ -1,4 +1,5 @@
 import {
+  CALCULATOR_EVENT_NAMES,
   CALCULATOR_FUNNEL,
   CALCULATOR_OUTCOMES,
   ERROR_EVENT_NAME,
@@ -336,9 +337,12 @@ export function buildSessionRuns(
   events: readonly AnalyticsEvent[],
   limit: number
 ): SessionRun[] {
-  const sorted = [...events].sort(
-    (a, b) => toTime(a.created_at) - toTime(b.created_at)
-  )
+  // Csak a kalkulátor eseményei alkotnak futást. Enélkül egy blogolvasó, aki
+  // csak a Preferred Sources gombra kattintott, üres checkpointokkal teli
+  // hamis futás-sort kapna.
+  const sorted = events
+    .filter((event) => CALCULATOR_EVENT_NAMES.has(event.name))
+    .sort((a, b) => toTime(a.created_at) - toTime(b.created_at))
 
   const bySession = new Map<string, AnalyticsEvent[]>()
   for (const event of sorted) {

@@ -111,10 +111,18 @@ values go in a gitignored `.env.local`.
 - [lib/leads.ts](lib/leads.ts) — lead status ranking, the two merge rules (status only
   strengthens; empty values never overwrite), and the Gmail follow-up template. Pure
   functions, deliberately separate from the route handler.
+- `CALCULATOR_EVENT_NAMES` in [lib/funnel.ts](lib/funnel.ts) is narrower than
+  `KNOWN_EVENT_NAMES` on purpose: only calculator events form a run. Adding a new
+  non-calculator event to the whitelist alone is safe; adding it to
+  `CALCULATOR_EVENT_NAMES` would make unrelated sessions render as empty runs.
 - [lib/errors.ts](lib/errors.ts) — `calculator_error` aggregation. **Count distinct
   sessions, never rows**: one failed request emits both a client and a server error with
   the same `session_id`. Client errors are also capped at 5 per session upstream, so
   event counts are a lower bound while the session rate is exact.
+- [lib/preferred-sources.ts](lib/preferred-sources.ts) — Google Preferred Sources
+  aggregation. Its panel deliberately **ignores the 7/30/90 period selector**: the
+  add count grows monotonically, so a windowed "cumulative" number would mislead. It
+  gets its own all-time query in [app/page.tsx](app/page.tsx).
 - [lib/props.ts](lib/props.ts) — the ingest clamp (24 keys, 300 chars, 4096 bytes,
   scalars only). Replaced the old key whitelist because error props are stage-dependent.
   Consequence: `props` is no longer trusted data — the paladi-web `/api/track` proxy that

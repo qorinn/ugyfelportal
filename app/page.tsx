@@ -9,8 +9,13 @@ import {
   type AnalyticsEvent,
   type FunnelRow,
 } from "@/lib/analytics"
-import { APP_ID, CALCULATOR_FUNNEL } from "@/lib/funnel"
+import {
+  APP_ID,
+  CALCULATOR_FUNNEL,
+  PREFERRED_SOURCE_EVENTS,
+} from "@/lib/funnel"
 import { buildErrorSummary } from "@/lib/errors"
+import { buildPreferredSourceSummary } from "@/lib/preferred-sources"
 import { type DisplayLead } from "@/lib/leads"
 import { supabaseAdmin } from "@/lib/supabase"
 import {
@@ -18,6 +23,7 @@ import {
   ManualFollowupPanel,
   RecentErrors,
 } from "@/components/error-panel"
+import { PreferredSourcesPanel } from "@/components/preferred-sources-panel"
 import { SessionRuns } from "@/components/session-runs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -90,6 +96,26 @@ async function loadEvents(days: number) {
   return (data ?? []) as AnalyticsEvent[]
 }
 
+// A Preferred Sources események szándékosan időszaktól függetlenül jönnek: a
+// hozzáadások száma monoton nő, egy 30 napos ablak "halmozott" száma félrevezető
+// lenne. Napi néhány eseményes forgalom, a meglévő (app_id, name, created_at)
+// index kiszolgálja.
+async function loadPreferredSourceEvents() {
+  const { data, error } = await supabaseAdmin()
+    .from("events")
+    .select("session_id, name, props, created_at")
+    .eq("app_id", APP_ID)
+    .in("name", Object.values(PREFERRED_SOURCE_EVENTS))
+    .order("created_at", { ascending: true })
+    .limit(10000)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as AnalyticsEvent[]
+}
+
 // A leadeket a látott munkamenetekre szűkítve kérjük le, nem időszakra: a lead
 // később is keletkezhet, mint az első esemény.
 async function loadLeads(sessionIds: string[]) {
@@ -147,11 +173,13 @@ export default async function Page({
 
   let events: AnalyticsEvent[] = []
   let leads = new Map<string, DisplayLead>()
+  let preferredSourceEvents: AnalyticsEvent[] = []
   let loadError: string | null = null
 
   try {
     events = await loadEvents(days)
     leads = await loadLeads([...new Set(events.map((e) => e.session_id))])
+    preferredSourceEvents = await loadPreferredSourceEvents()
   } catch (error) {
     loadError = error instanceof Error ? error.message : String(error)
   }
@@ -160,6 +188,7 @@ export default async function Page({
   const outcomes = buildOutcomes(events, funnel.at(-1)?.sessions ?? 0)
   const breakdown = buildProjectTypeBreakdown(events)
   const runs = buildSessionRuns(events, RUN_LIMIT)
+  const preferredSources = buildPreferredSourceSummary(preferredSourceEvents)
   const errorSummary = buildErrorSummary(
     events,
     CALCULATOR_FUNNEL[0].name,
@@ -321,6 +350,8 @@ export default async function Page({
           )}
         </CardContent>
       </Card>
+
+      <PreferredSourcesPanel summary={preferredSources} />
 
       <RecentErrors summary={errorSummary} limit={RAW_ERROR_LIMIT} />
 
