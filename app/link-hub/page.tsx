@@ -176,19 +176,19 @@ export default async function LinkHubAnalyticsPage({
               description="Összes Link Hub page_view esemény."
             />
             <MetricCard
-              label="Egyedi látogatók"
+              label="Egyedi munkamenetek"
               value={numberFormat.format(analytics.viewSessions)}
-              description="Egyedi sessionök page_view alapján."
+              description="Page_view eseménnyel rendelkező sessionök."
             />
             <MetricCard
               label="Kattintások"
               value={numberFormat.format(analytics.clicks)}
-              description="Összes szerveroldalon mért link_click."
+              description="Page_view-val rendelkező munkamenetek kattintásai."
             />
             <MetricCard
               label="CTR"
               value={`${percentFormat.format(analytics.ctr)}%`}
-              description="Egyedi kattintó sessionök / egyedi látogatók."
+              description="Kattintó munkamenetek / összes munkamenet."
             />
           </section>
 

@@ -125,7 +125,7 @@ export function LinkHubOverviewChart({
       <CardHeader>
         <CardTitle>Link Hub trend</CardTitle>
         <CardDescription>
-          Napi egyedi látogatók és szerveroldalon mért kattintások.
+          Napi munkamenetek és az ezekhez kapcsolható kattintások.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -154,7 +154,7 @@ export function LinkHubOverviewChart({
               rows={(point) => [
                 {
                   color: "var(--chart-3)",
-                  label: "Egyedi látogató",
+                  label: "Munkamenet",
                   value: numberFormat.format(numericValue(point, "visitors")),
                 },
                 {
@@ -170,7 +170,7 @@ export function LinkHubOverviewChart({
             <EmptyHeader>
               <EmptyTitle>Még nincs Link Hub-adat</EmptyTitle>
               <EmptyDescription>
-                Az első látogató vagy kattintás után itt jelenik meg a trend.
+                Az első oldalmegtekintés után itt jelenik meg a trend.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

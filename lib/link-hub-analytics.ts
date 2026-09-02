@@ -69,7 +69,15 @@ export function buildLinkHubAnalytics(
   options: LinkHubAnalyticsOptions = {}
 ): LinkHubAnalytics {
   const linksById = new Map(links.map((link) => [link.id, link]))
-  const viewSessions = new Set<string>()
+  // A CTR nevezője és számlálója ugyanabból a halmazból kell származzon.
+  // Redirectet crawler vagy a page-view kérés előtt kattintó látogató is
+  // meghívhat, ezért a page_view nélküli sessionök kattintásait nem tekintjük
+  // ismert Link Hub-látogatói aktivitásnak.
+  const viewSessions = new Set(
+    events
+      .filter((event) => event.event_type === "page_view")
+      .map((event) => event.session_id)
+  )
   const clickSessions = new Set<string>()
   const byLink = new Map<string, { clicks: number; sessions: Set<string> }>()
   const sourceBySession = new Map<string, string>()
@@ -101,12 +109,14 @@ export function buildLinkHubAnalytics(
 
     if (event.event_type === "page_view") {
       pageViews += 1
-      viewSessions.add(event.session_id)
       dayCounter.pageViews += 1
       dayCounter.viewSessions.add(event.session_id)
     }
 
-    if (event.event_type === "link_click") {
+    if (
+      event.event_type === "link_click" &&
+      viewSessions.has(event.session_id)
+    ) {
       clicks += 1
       clickSessions.add(event.session_id)
       dayCounter.clicks += 1
@@ -131,6 +141,8 @@ export function buildLinkHubAnalytics(
     { sessions: Set<string>; pageViews: number; clicks: number }
   >()
   for (const event of events) {
+    if (!viewSessions.has(event.session_id)) continue
+
     const source =
       sourceBySession.get(event.session_id) ?? "Közvetlen / ismeretlen"
     const counter = sources.get(source) ?? {
@@ -190,7 +202,11 @@ export function buildLinkHubAnalytics(
       for (let date = startDate; date <= endDate; date = nextDateKey(date)) {
         const counter = daily.get(date)
         const visitors = counter?.viewSessions.size ?? 0
-        const dailyClickSessions = counter?.clickSessions.size ?? 0
+        const dailyClickSessions = counter
+          ? [...counter.clickSessions].filter((sessionId) =>
+              counter.viewSessions.has(sessionId)
+            ).length
+          : 0
         rows.push({
           date,
           pageViews: counter?.pageViews ?? 0,

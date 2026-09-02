@@ -35,7 +35,7 @@ nyílnak meg; ez teszi lehetővé a kattintásmérést.
 A belépés utáni főoldal (`/`) központi dashboardként foglalja össze a
 kalkulátor és a Link Hub legfontosabb eredményeit. A négy kiemelt mutató mellett
 Bklit tölcsérgrafikon mutatja a kalkulátor indítás → kérdések → e-mail útját, a
-Link Hub grafikonja pedig a napi egyedi látogatókat és kattintásokat. A 30, 60,
+Link Hub grafikonja pedig a napi munkameneteket és kattintásokat. A 30, 60,
 90, 180 napos és teljes időszakos nézet között itt lehet váltani; az esemény
 nélküli napok is nullás adatpontként jelennek meg.
 

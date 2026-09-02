@@ -182,13 +182,13 @@ export default async function HomePage({
         aria-label="Fő mutatók"
       >
         <MetricCard
-          label="Link Hub látogatók"
+          label="Link Hub munkamenetek"
           value={
             linkHubAnalytics
               ? numberFormat.format(linkHubAnalytics.viewSessions)
               : "—"
           }
-          description="Egyedi látogatói munkamenetek."
+          description="Page_view eseménnyel rendelkező sessionök."
         />
         <MetricCard
           label="Linkkattintások"
