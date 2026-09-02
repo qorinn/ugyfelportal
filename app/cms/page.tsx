@@ -11,6 +11,7 @@ import {
 } from "@remixicon/react"
 
 import { CmsNativeSelect, CmsTextarea } from "@/components/cms-form-controls"
+import { CmsFeedbackToast } from "@/components/cms-feedback-toast"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -415,8 +416,7 @@ export default async function CmsPage({
         </div>
       </header>
 
-      {params.notice && <Card><CardContent className="text-sm">{params.notice}</CardContent></Card>}
-      {params.error && <Card><CardHeader><CardTitle>Nem sikerült menteni</CardTitle><CardDescription>{params.error}</CardDescription></CardHeader></Card>}
+      <CmsFeedbackToast notice={params.notice} error={params.error} />
 
       <ProfileForm profile={content.profile} />
 
