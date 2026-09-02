@@ -30,6 +30,15 @@ A CMS sosem kerül a publikus Link Hub helyére. A publikus alkalmazás csak
 cél URL-t, de a publikus oldalon a stabil `/go/{slug}` útvonalon keresztül
 nyílnak meg; ez teszi lehetővé a kattintásmérést.
 
+## Link Hub analitika
+
+A belépés után a `/link-hub` adminoldal mutatja alapértelmezetten a Link Hub
+30 napos analitikáját. Innen megnyitható a hozzá tartozó CMS (`/cms`), a 7, 30
+és 90 napos időszak között pedig az oldalon lehet váltani. A kimutatás a
+`analytics_events` rekordjaiból számolja az oldalmegtekintéseket, egyedi
+sessionöket, kattintásokat, CTR-t, a linkek teljesítményét, UTM-forrásokat,
+napi bontást és az utolsó eseményeket.
+
 ## Tartalommodell
 
 | Elem | Szerepe |

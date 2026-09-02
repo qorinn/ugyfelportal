@@ -401,9 +401,9 @@ export default async function CmsPage({
           <h1 className="text-lg font-medium">Tartalomkezelés</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" nativeButton={false} render={<Link href="/" />}>
+          <Button variant="outline" nativeButton={false} render={<Link href="/link-hub" />}>
             <RiArrowLeftLine data-icon="inline-start" />
-            Analitika
+            Link Hub analitika
           </Button>
           <form method="post" action="/api/cms/deploy">
             <input type="hidden" name="action" value="deploy" />

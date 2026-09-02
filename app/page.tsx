@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { RiFileList3Line, RiLogoutBoxRLine } from "@remixicon/react"
+import { RiBarChartBoxLine, RiFileList3Line, RiLogoutBoxRLine } from "@remixicon/react"
 
 import {
   buildFunnel,
@@ -206,6 +206,10 @@ export default async function Page({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" nativeButton={false} render={<Link href="/link-hub" />}>
+            <RiBarChartBoxLine data-icon="inline-start" />
+            Link Hub analitika
+          </Button>
           <Button variant="outline" nativeButton={false} render={<Link href="/cms" />}>
             <RiFileList3Line data-icon="inline-start" />
             CMS
