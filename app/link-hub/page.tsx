@@ -6,12 +6,14 @@ import {
   RiLogoutBoxRLine,
 } from "@remixicon/react"
 
+import { buildLinkHubAnalytics } from "@/lib/link-hub-analytics"
 import {
-  buildLinkHubAnalytics,
-  type LinkHubEvent,
-  type LinkHubLink,
-} from "@/lib/link-hub-analytics"
-import { supabaseAdmin } from "@/lib/supabase"
+  analyticsPeriodLabel,
+  DETAIL_PERIODS,
+  loadLinkHubEvents,
+  loadLinkHubLinks,
+  parseAnalyticsPeriod,
+} from "@/lib/analytics-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,7 +40,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const PERIODS = [7, 30, 90] as const
 const numberFormat = new Intl.NumberFormat("hu-HU")
 const percentFormat = new Intl.NumberFormat("hu-HU", {
   minimumFractionDigits: 1,
@@ -53,37 +54,6 @@ const dateTimeFormat = new Intl.DateTimeFormat("hu-HU", {
   timeStyle: "medium",
   timeZone: "Europe/Budapest",
 })
-
-function parseDays(value: string | string[] | undefined): number {
-  const candidate = Number(Array.isArray(value) ? value[0] : value)
-  return PERIODS.includes(candidate as (typeof PERIODS)[number])
-    ? candidate
-    : 30
-}
-
-async function loadAnalytics(days: number) {
-  const now = new Date()
-  const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-  const client = supabaseAdmin()
-  const [eventsResult, linksResult] = await Promise.all([
-    client
-      .from("analytics_events")
-      .select("event_type, link_id, session_id, utm_source, created_at")
-      .gte("created_at", since.toISOString())
-      .order("created_at", { ascending: true })
-      .limit(10000),
-    client.from("links").select("id, label, target_url"),
-  ])
-
-  if (eventsResult.error) throw new Error(eventsResult.error.message)
-  if (linksResult.error) throw new Error(linksResult.error.message)
-
-  return buildLinkHubAnalytics(
-    (eventsResult.data ?? []) as LinkHubEvent[],
-    (linksResult.data ?? []) as LinkHubLink[],
-    { startAt: since, endAt: now }
-  )
-}
 
 function MetricCard({
   label,
@@ -115,12 +85,21 @@ export default async function LinkHubAnalyticsPage({
   searchParams: Promise<{ days?: string | string[] }>
 }) {
   await connection()
-  const days = parseDays((await searchParams).days)
-  let analytics: Awaited<ReturnType<typeof loadAnalytics>> | null = null
+  const days = parseAnalyticsPeriod((await searchParams).days)
+  let analytics: ReturnType<typeof buildLinkHubAnalytics> | null = null
   let loadError: string | null = null
 
   try {
-    analytics = await loadAnalytics(days)
+    const now = new Date()
+    const [{ events, since }, links] = await Promise.all([
+      loadLinkHubEvents(days, now),
+      loadLinkHubLinks(),
+    ])
+    analytics = buildLinkHubAnalytics(events, links, {
+      startAt:
+        since ?? (events[0] ? new Date(events[0].created_at) : undefined),
+      endAt: now,
+    })
   } catch (error) {
     loadError = error instanceof Error ? error.message : String(error)
   }
@@ -131,7 +110,9 @@ export default async function LinkHubAnalyticsPage({
         <div>
           <p className="text-sm text-muted-foreground">Developer Link Hub</p>
           <h1 className="text-lg font-medium">Analitika</h1>
-          <p className="text-sm text-muted-foreground">Utolsó {days} nap</p>
+          <p className="text-sm text-muted-foreground">
+            {analyticsPeriodLabel(days)}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -145,24 +126,24 @@ export default async function LinkHubAnalyticsPage({
           <Button
             variant="outline"
             nativeButton={false}
-            render={<Link href="/calculator" />}
+            render={<Link href="/" />}
           >
             <RiHomeOfficeLine data-icon="inline-start" />
-            Kalkulátor-analitika
+            Központi analitika
           </Button>
-          <nav className="flex gap-1" aria-label="Időszak">
-            {PERIODS.map((period) => (
+          <nav className="flex flex-wrap gap-1" aria-label="Időszak">
+            {[...DETAIL_PERIODS, "all" as const].map((period) => (
               <Button
                 key={period}
                 variant={period === days ? "default" : "outline"}
                 nativeButton={false}
                 render={<Link href={`/link-hub?days=${period}`} />}
               >
-                {period} nap
+                {period === "all" ? "Összes" : `${period} nap`}
               </Button>
             ))}
           </nav>
-          <Separator orientation="vertical" className="h-6" />
+          <Separator orientation="vertical" className="hidden h-6 sm:block" />
           <form method="post" action="/api/logout">
             <Button type="submit" variant="ghost">
               <RiLogoutBoxRLine data-icon="inline-start" />

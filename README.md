@@ -30,29 +30,38 @@ A CMS sosem kerül a publikus Link Hub helyére. A publikus alkalmazás csak
 cél URL-t, de a publikus oldalon a stabil `/go/{slug}` útvonalon keresztül
 nyílnak meg; ez teszi lehetővé a kattintásmérést.
 
-## Link Hub analitika
+## Analitika
 
-A belépés utáni főoldal (`/`) a Link Hub dashboard: alapértelmezésben az
-utolsó 30 nap forgalmi, kattintási és CTR-trendjeit mutatja Bklit grafikonokon.
-A 30, 60, 90, 180 napos és teljes időszakos nézet között itt lehet váltani;
-az esemény nélküli napok is nullás adatpontként jelennek meg. Innen közvetlenül
-megnyitható a CMS (`/cms`) és a részletes Link Hub analitika (`/link-hub`).
+A belépés utáni főoldal (`/`) központi dashboardként foglalja össze a
+kalkulátor és a Link Hub legfontosabb eredményeit. A négy kiemelt mutató mellett
+Bklit tölcsérgrafikon mutatja a kalkulátor indítás → kérdések → e-mail útját, a
+Link Hub grafikonja pedig a napi egyedi látogatókat és kattintásokat. A 30, 60,
+90, 180 napos és teljes időszakos nézet között itt lehet váltani; az esemény
+nélküli napok is nullás adatpontként jelennek meg.
 
-A `/link-hub` nézet a táblázatos részleteket tartalmazza: linkteljesítmény,
-UTM-források, napi bontás és a legutóbbi események. A korábbi kalkulátor
-analitika külön a `/calculator` útvonalon érhető el. Minden Link Hub
-kimutatás az `analytics_events` rekordjaiból számol oldalmegtekintést, egyedi
-sessiont, kattintást és CTR-t.
+A részletes nézetek külön útvonalon maradnak:
+
+- `/calculator`: kalkulátorfutások, projekttípusok, hibák, utánkövetések,
+  Preferred Sources és nyers események;
+- `/link-hub`: linkteljesítmény, UTM-források, napi bontás és legutóbbi
+  események;
+- `/cms`: a Link Hub tartalomkezelője, amely a részletes Link Hub analitikából
+  nyitható meg.
+
+A központi és részletes analitikai lekérdezések lapozva olvassák a Supabase
+rekordjait, ezért a teljes időszakos nézet nem csonkolódik 10 000 eseménynél. A
+két termékterület egymástól függetlenül töltődik: az egyik hibája nem rejti el a
+másik összefoglalóját.
 
 ## Tartalommodell
 
-| Elem | Szerepe |
-| --- | --- |
-| `site_profile` | Egyetlen profil és SEO-beállításai |
-| `sections` | Link-, közösségi- vagy projektszekciók |
-| `projects` | Portfólió- és open source projektkártyák |
-| `links` | Szekcióhoz vagy projekthez tartozó kattintható elemek |
-| `analytics_sessions`, `analytics_events` | Anonim oldalmegtekintési és kattintási események |
+| Elem                                     | Szerepe                                               |
+| ---------------------------------------- | ----------------------------------------------------- |
+| `site_profile`                           | Egyetlen profil és SEO-beállításai                    |
+| `sections`                               | Link-, közösségi- vagy projektszekciók                |
+| `projects`                               | Portfólió- és open source projektkártyák              |
+| `links`                                  | Szekcióhoz vagy projekthez tartozó kattintható elemek |
+| `analytics_sessions`, `analytics_events` | Anonim oldalmegtekintési és kattintási események      |
 
 Egy trackelt linkhez kötelező az egyedi, stabil `redirect_slug`. A slugot ne
 változtasd meg utólag, mert az analitikai folytonosság és a korábban megosztott
@@ -71,13 +80,13 @@ Az admin bejelentkezéshez állítsd be a `DASHBOARD_PASSWORD` értékét a
 
 ## Környezeti változók
 
-| Változó | Mire kell? |
-| --- | --- |
-| `SUPABASE_URL` | A Supabase projekt URL-je |
-| `SUPABASE_SERVICE_ROLE_KEY` | Kizárólag szerveroldali CMS-műveletekhez |
-| `DASHBOARD_PASSWORD` | Az admin felület belépési jelszava |
-| `INGEST_SECRET` | A meglévő analitikai ingest végpont hitelesítéséhez |
-| `NETLIFY_BUILD_HOOK_URL` | A publikus Link Hub újraépítésének indításához |
+| Változó                     | Mire kell?                                          |
+| --------------------------- | --------------------------------------------------- |
+| `SUPABASE_URL`              | A Supabase projekt URL-je                           |
+| `SUPABASE_SERVICE_ROLE_KEY` | Kizárólag szerveroldali CMS-műveletekhez            |
+| `DASHBOARD_PASSWORD`        | Az admin felület belépési jelszava                  |
+| `INGEST_SECRET`             | A meglévő analitikai ingest végpont hitelesítéséhez |
+| `NETLIFY_BUILD_HOOK_URL`    | A publikus Link Hub újraépítésének indításához      |
 
 > A `SUPABASE_SERVICE_ROLE_KEY`, a jelszavak és a build hook URL-je titok. Ne
 > kerüljön `NEXT_PUBLIC_` változóba, commitba vagy a publikus Link Hubba.

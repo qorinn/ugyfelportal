@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { RiBarChartBoxLine, RiFileList3Line, RiLogoutBoxRLine } from "@remixicon/react"
+import { connection } from "next/server"
+import { RiBarChartBoxLine, RiLogoutBoxRLine } from "@remixicon/react"
 
 import {
   buildFunnel,
@@ -14,6 +15,12 @@ import {
   CALCULATOR_FUNNEL,
   PREFERRED_SOURCE_EVENTS,
 } from "@/lib/funnel"
+import {
+  analyticsPeriodLabel,
+  DETAIL_PERIODS,
+  loadCalculatorEvents,
+  parseAnalyticsPeriod,
+} from "@/lib/analytics-data"
 import { buildErrorSummary } from "@/lib/errors"
 import { buildPreferredSourceSummary } from "@/lib/preferred-sources"
 import { type DisplayLead } from "@/lib/leads"
@@ -51,7 +58,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const PERIODS = [7, 30, 90] as const
 const RAW_EVENT_LIMIT = 50
 const RUN_LIMIT = 20
 const RAW_ERROR_LIMIT = 50
@@ -69,51 +75,18 @@ const dateTimeFormat = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
 })
 
-function parseDays(value: string | string[] | undefined): number {
-  const candidate = Number(Array.isArray(value) ? value[0] : value)
-  return PERIODS.includes(candidate as (typeof PERIODS)[number])
-    ? candidate
-    : 30
-}
-
-async function loadEvents(days: number) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-
-  // Nyers eseményeket töltünk le és TS-ben aggregálunk: a funnel megváltoztatása
-  // így egy tömb átírása, nem migráció. Napi néhány tucat eseménynél ez bőven elég.
-  const { data, error } = await supabaseAdmin()
-    .from("events")
-    .select("session_id, name, props, created_at")
-    .eq("app_id", APP_ID)
-    .gte("created_at", since.toISOString())
-    .order("created_at", { ascending: true })
-    .limit(10000)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as AnalyticsEvent[]
-}
-
 // A Preferred Sources események szándékosan időszaktól függetlenül jönnek: a
 // hozzáadások száma monoton nő, egy 30 napos ablak "halmozott" száma félrevezető
 // lenne. Napi néhány eseményes forgalom, a meglévő (app_id, name, created_at)
 // index kiszolgálja.
 async function loadPreferredSourceEvents() {
-  const { data, error } = await supabaseAdmin()
-    .from("events")
-    .select("session_id, name, props, created_at")
-    .eq("app_id", APP_ID)
-    .in("name", Object.values(PREFERRED_SOURCE_EVENTS))
-    .order("created_at", { ascending: true })
-    .limit(10000)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return (data ?? []) as AnalyticsEvent[]
+  return (
+    await loadCalculatorEvents(
+      "all",
+      new Date(),
+      Object.values(PREFERRED_SOURCE_EVENTS)
+    )
+  ).events
 }
 
 // A leadeket a látott munkamenetekre szűkítve kérjük le, nem időszakra: a lead
@@ -169,7 +142,8 @@ export default async function Page({
 }: {
   searchParams: Promise<{ days?: string | string[] }>
 }) {
-  const days = parseDays((await searchParams).days)
+  await connection()
+  const days = parseAnalyticsPeriod((await searchParams).days)
 
   let events: AnalyticsEvent[] = []
   let leads = new Map<string, DisplayLead>()
@@ -177,7 +151,7 @@ export default async function Page({
   let loadError: string | null = null
 
   try {
-    events = await loadEvents(days)
+    events = (await loadCalculatorEvents(days, new Date())).events
     leads = await loadLeads([...new Set(events.map((e) => e.session_id))])
     preferredSourceEvents = await loadPreferredSourceEvents()
   } catch (error) {
@@ -202,31 +176,31 @@ export default async function Page({
         <div>
           <h1 className="text-lg font-medium">Kalkulátor-analitika</h1>
           <p className="text-sm text-muted-foreground">
-            {APP_ID} · utolsó {days} nap
+            {APP_ID} · {analyticsPeriodLabel(days).toLocaleLowerCase("hu-HU")}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" nativeButton={false} render={<Link href="/" />}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link href="/" />}
+          >
             <RiBarChartBoxLine data-icon="inline-start" />
-            Link Hub dashboard
+            Központi analitika
           </Button>
-          <Button variant="outline" nativeButton={false} render={<Link href="/cms" />}>
-            <RiFileList3Line data-icon="inline-start" />
-            CMS
-          </Button>
-          <nav className="flex gap-1">
-            {PERIODS.map((period) => (
+          <nav className="flex flex-wrap gap-1" aria-label="Időszak">
+            {[...DETAIL_PERIODS, "all" as const].map((period) => (
               <Button
                 key={period}
                 variant={period === days ? "default" : "outline"}
                 nativeButton={false}
                 render={<Link href={`/calculator?days=${period}`} />}
               >
-                {period} nap
+                {period === "all" ? "Összes" : `${period} nap`}
               </Button>
             ))}
           </nav>
-          <Separator orientation="vertical" className="h-6" />
+          <Separator orientation="vertical" className="hidden h-6 sm:block" />
           <form method="post" action="/api/logout">
             <Button type="submit" variant="ghost">
               <RiLogoutBoxRLine data-icon="inline-start" />
