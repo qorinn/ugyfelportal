@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bklit registry source: upstream React Compiler lint violations are kept
+    // isolated from application code until the registry releases compatible files.
+    "components/charts/**",
+    "components/shimmering-text.tsx",
   ]),
 ]);
 

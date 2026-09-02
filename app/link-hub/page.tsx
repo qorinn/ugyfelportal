@@ -62,7 +62,8 @@ function parseDays(value: string | string[] | undefined): number {
 }
 
 async function loadAnalytics(days: number) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const now = new Date()
+  const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
   const client = supabaseAdmin()
   const [eventsResult, linksResult] = await Promise.all([
     client
@@ -79,7 +80,8 @@ async function loadAnalytics(days: number) {
 
   return buildLinkHubAnalytics(
     (eventsResult.data ?? []) as LinkHubEvent[],
-    (linksResult.data ?? []) as LinkHubLink[]
+    (linksResult.data ?? []) as LinkHubLink[],
+    { startAt: since, endAt: now }
   )
 }
 
@@ -143,7 +145,7 @@ export default async function LinkHubAnalyticsPage({
           <Button
             variant="outline"
             nativeButton={false}
-            render={<Link href="/" />}
+            render={<Link href="/calculator" />}
           >
             <RiHomeOfficeLine data-icon="inline-start" />
             Kalkulátor-analitika

@@ -32,12 +32,17 @@ nyílnak meg; ez teszi lehetővé a kattintásmérést.
 
 ## Link Hub analitika
 
-A belépés után a `/link-hub` adminoldal mutatja alapértelmezetten a Link Hub
-30 napos analitikáját. Innen megnyitható a hozzá tartozó CMS (`/cms`), a 7, 30
-és 90 napos időszak között pedig az oldalon lehet váltani. A kimutatás a
-`analytics_events` rekordjaiból számolja az oldalmegtekintéseket, egyedi
-sessionöket, kattintásokat, CTR-t, a linkek teljesítményét, UTM-forrásokat,
-napi bontást és az utolsó eseményeket.
+A belépés utáni főoldal (`/`) a Link Hub dashboard: alapértelmezésben az
+utolsó 30 nap forgalmi, kattintási és CTR-trendjeit mutatja Bklit grafikonokon.
+A 30, 60, 90, 180 napos és teljes időszakos nézet között itt lehet váltani;
+az esemény nélküli napok is nullás adatpontként jelennek meg. Innen közvetlenül
+megnyitható a CMS (`/cms`) és a részletes Link Hub analitika (`/link-hub`).
+
+A `/link-hub` nézet a táblázatos részleteket tartalmazza: linkteljesítmény,
+UTM-források, napi bontás és a legutóbbi események. A korábbi kalkulátor
+analitika külön a `/calculator` útvonalon érhető el. Minden Link Hub
+kimutatás az `analytics_events` rekordjaiból számol oldalmegtekintést, egyedi
+sessiont, kattintást és CTR-t.
 
 ## Tartalommodell
 

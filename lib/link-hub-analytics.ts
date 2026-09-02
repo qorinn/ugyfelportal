@@ -32,8 +32,20 @@ export type LinkHubAnalytics = {
     pageViews: number
     clicks: number
   }>
-  daily: Array<{ date: string; pageViews: number; clicks: number }>
+  daily: Array<{
+    date: string
+    pageViews: number
+    visitors: number
+    clicks: number
+    clickSessions: number
+    ctr: number
+  }>
   recentEvents: Array<LinkHubEvent & { label: string | null }>
+}
+
+export type LinkHubAnalyticsOptions = {
+  startAt?: Date
+  endAt?: Date
 }
 
 function ratio(part: number, whole: number) {
@@ -46,23 +58,42 @@ function localDateKey(value: string) {
   }).format(new Date(value))
 }
 
+function nextDateKey(date: string) {
+  const [year, month, day] = date.split("-").map(Number)
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10)
+}
+
 export function buildLinkHubAnalytics(
   events: readonly LinkHubEvent[],
-  links: readonly LinkHubLink[]
+  links: readonly LinkHubLink[],
+  options: LinkHubAnalyticsOptions = {}
 ): LinkHubAnalytics {
   const linksById = new Map(links.map((link) => [link.id, link]))
   const viewSessions = new Set<string>()
   const clickSessions = new Set<string>()
   const byLink = new Map<string, { clicks: number; sessions: Set<string> }>()
   const sourceBySession = new Map<string, string>()
-  const daily = new Map<string, { pageViews: number; clicks: number }>()
+  const daily = new Map<
+    string,
+    {
+      pageViews: number
+      clicks: number
+      viewSessions: Set<string>
+      clickSessions: Set<string>
+    }
+  >()
 
   let pageViews = 0
   let clicks = 0
 
   for (const event of events) {
     const day = localDateKey(event.created_at)
-    const dayCounter = daily.get(day) ?? { pageViews: 0, clicks: 0 }
+    const dayCounter = daily.get(day) ?? {
+      pageViews: 0,
+      clicks: 0,
+      viewSessions: new Set<string>(),
+      clickSessions: new Set<string>(),
+    }
 
     if (event.utm_source && !sourceBySession.has(event.session_id)) {
       sourceBySession.set(event.session_id, event.utm_source)
@@ -72,12 +103,14 @@ export function buildLinkHubAnalytics(
       pageViews += 1
       viewSessions.add(event.session_id)
       dayCounter.pageViews += 1
+      dayCounter.viewSessions.add(event.session_id)
     }
 
     if (event.event_type === "link_click") {
       clicks += 1
       clickSessions.add(event.session_id)
       dayCounter.clicks += 1
+      dayCounter.clickSessions.add(event.session_id)
 
       if (event.link_id) {
         const counter = byLink.get(event.link_id) ?? {
@@ -143,9 +176,33 @@ export function buildLinkHubAnalytics(
         (a, b) =>
           b.sessions - a.sessions || a.source.localeCompare(b.source, "hu")
       ),
-    daily: [...daily.entries()]
-      .map(([date, counter]) => ({ date, ...counter }))
-      .sort((a, b) => b.date.localeCompare(a.date)),
+    daily: (() => {
+      const startDate = options.startAt
+        ? localDateKey(options.startAt.toISOString())
+        : [...daily.keys()].sort()[0]
+      const endDate = options.endAt
+        ? localDateKey(options.endAt.toISOString())
+        : [...daily.keys()].sort().at(-1)
+
+      if (!startDate || !endDate || startDate > endDate) return []
+
+      const rows: LinkHubAnalytics["daily"] = []
+      for (let date = startDate; date <= endDate; date = nextDateKey(date)) {
+        const counter = daily.get(date)
+        const visitors = counter?.viewSessions.size ?? 0
+        const dailyClickSessions = counter?.clickSessions.size ?? 0
+        rows.push({
+          date,
+          pageViews: counter?.pageViews ?? 0,
+          visitors,
+          clicks: counter?.clicks ?? 0,
+          clickSessions: dailyClickSessions,
+          ctr: ratio(dailyClickSessions, visitors),
+        })
+      }
+
+      return rows.reverse()
+    })(),
     recentEvents: events
       .slice(-20)
       .reverse()
